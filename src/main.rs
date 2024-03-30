@@ -65,4 +65,15 @@ fn main() {
         .expect("Failed to open V2rayU");
 
     println!("V2rayU has been restarted.");
+
+    // open the chrome omega extension page, and allow the user to click the disable/enable button
+    // the shell script:
+    // osascript -e 'tell application "Google Chrome" to open location "chrome://extensions/?id=padekgcemlokbadohgkifijomclgjgif"'
+    let _ = Command::new("/opt/local/bin/open_omega_plugin")
+        .output()
+        .expect("Failed to open Omega plugin page in Chrome");
+
+    println!(
+        "Please click the disable/enable button in the Omega plugin page to reload the rules."
+    );
 }
