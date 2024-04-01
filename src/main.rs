@@ -22,9 +22,8 @@ fn main() {
         println!("failed to read user rules, maybe the key not exists, or the domain not exists");
         return;
     }
-    let mut rules = String::from_utf8_lossy(&output.stdout).to_string();
-    println!("current user rules: {}", rules);
-
+    // fetch the rules from the output
+    let mut rules = fetch_rules(&output);
     // read the changes of rules from user input
     println!("Input the new rules followed by lines, press Ctrl+D to finish:");
     let mut user_input = String::new();
@@ -32,10 +31,11 @@ fn main() {
         .read_to_string(&mut user_input)
         .expect("failed to read input");
     let user_input = user_input.trim_end_matches('\n');
-
-    // in memory, append the new rules to the existing rules
-    rules.push_str(&user_input);
-
+    // check if user_input already exists in rules
+    if !rules.contains(user_input) {
+        // in memory, append the new rules to the existing rules
+        rules.push_str(&user_input);
+    }
     // update the user rules finally
     Command::new("defaults")
         .args(["write", domain, key, &rules])
@@ -46,9 +46,26 @@ fn main() {
         println!("failed to write user rules");
         return;
     }
-
     println!("user rules updated successfully! trying to reload the rules in V2rayU...");
+    restart_v2rayu_application();
+}
 
+fn fetch_rules(output: &std::process::Output) -> String {
+    let mut rules = String::from_utf8_lossy(&output.stdout).to_string();
+    let mut cleaned_rules = String::new();
+    for line in rules.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        cleaned_rules.push_str(line);
+        cleaned_rules.push_str("\n");
+    }
+    rules = cleaned_rules;
+    println!("current user rules: {}", rules);
+    rules
+}
+
+fn restart_v2rayu_application() {
     // close the V2rayU application
     let _ = Command::new("osascript")
         .args(&["-e", "tell application \"V2rayU\" to quit"])
@@ -59,21 +76,26 @@ fn main() {
     thread::sleep(Duration::from_secs(2));
 
     // restart the V2rayU application
-    let _ = Command::new("open")
+    let start_output = Command::new("open")
         .args(&["-a", "/Applications/V2rayU.app"])
         .output()
         .expect("Failed to open V2rayU");
-
-    println!("V2rayU has been restarted.");
-
-    // open the chrome omega extension page, and allow the user to click the disable/enable button
-    // the shell script:
-    // osascript -e 'tell application "Google Chrome" to open location "chrome://extensions/?id=padekgcemlokbadohgkifijomclgjgif"'
-    let _ = Command::new("/opt/local/bin/open_omega_plugin")
-        .output()
-        .expect("Failed to open Omega plugin page in Chrome");
-
-    println!(
-        "Please click the disable/enable button in the Omega plugin page to reload the rules."
-    );
+    if start_output.status.success() {
+        println!("V2rayU has been restarted.");
+    } else {
+        println!("Failed to restart V2rayU.");
+    }
 }
+// /**  **/
+// fn open_chrome_omega_extenstion_page() {
+//     // open the chrome omega extension page, and allow the user to click the disable/enable button
+//     // the shell script:
+//     // osascript -e 'tell application "Google Chrome" to open location "chrome://extensions/?id=padekgcemlokbadohgkifijomclgjgif"'
+//     let _ = Command::new("/opt/local/bin/open_omega_plugin")
+//         .output()
+//         .expect("Failed to open Omega plugin page in Chrome");
+
+//     println!(
+//         "Please click the disable/enable button in the Omega plugin page to reload the rules."
+//     );
+// }
